@@ -96,9 +96,17 @@ def recommend_stocks(stocks_list):
 
 def get_llm_suggestions(recommendations, investment_amount, currency):
     """Use OpenAI GPT for advanced buy/sell suggestions"""
-    openai.api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-    if not openai.api_key:
-        return "OpenAI API key not set. Please configure it to get AI suggestions."
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        try:
+            api_key = st.secrets["OPENAI_API_KEY"]
+        except (FileNotFoundError, KeyError):
+            pass
+    
+    if not api_key:
+        return "OpenAI API key not set. Please set the OPENAI_API_KEY environment variable or add it to Streamlit secrets."
+    
+    openai.api_key = api_key
     
     prompt = f"""
     You are an expert stock trader AI with deep knowledge of global markets, technical analysis, fundamental analysis, and trading strategies. Based on the following stock data from the last month, provide buy recommendations for today.
