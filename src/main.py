@@ -9,7 +9,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.express as px
-import groq
+import openai
 from twilio.rest import Client
 import os
 from datetime import datetime
@@ -87,10 +87,10 @@ def recommend_stocks(stocks_list):
     return recommendations[:10]
 
 def get_llm_suggestions(recommendations, investment_amount, currency):
-    """Use Groq LLM for advanced buy/sell suggestions"""
-    api_key = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY"))
-    if not api_key:
-        return "Groq API key not set. Please configure it to get AI suggestions."
+    """Use OpenAI GPT for advanced buy/sell suggestions"""
+    openai.api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+    if not openai.api_key:
+        return "OpenAI API key not set. Please configure it to get AI suggestions."
     
     prompt = f"""
     You are an expert stock trader AI with deep knowledge of global markets, technical analysis, fundamental analysis, and trading strategies. Based on the following stock data from the last month, provide buy recommendations for today.
@@ -102,9 +102,8 @@ def get_llm_suggestions(recommendations, investment_amount, currency):
     """
     
     try:
-        client = groq.Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model="llama3-8b-8192",
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1000
         )

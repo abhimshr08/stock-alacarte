@@ -4,7 +4,7 @@ This application uses AI (Large Language Models) to study global markets and pro
 
 ## Features
 
-- AI-powered buy recommendations using Groq (free Llama 3 models)
+- AI-powered buy recommendations using OpenAI GPT-3.5-turbo
 - Interactive charts with Plotly
 - Region-based stock analysis (US, India, Europe, Asia) with appropriate currencies (USD, INR, EUR, CNY)
 - Personalized investment allocations
@@ -23,7 +23,7 @@ This application uses AI (Large Language Models) to study global markets and pro
 
 Create a `.env` file or set environment variables:
 
-- `GROQ_API_KEY`: Your Groq API key for free AI suggestions
+- `OPENAI_API_KEY`: Your OpenAI API key for AI suggestions
 - `TWILIO_ACCOUNT_SID`: Twilio account SID for SMS
 - `TWILIO_AUTH_TOKEN`: Twilio auth token
 - `TWILIO_PHONE_NUMBER`: Your Twilio phone number
@@ -37,4 +37,4 @@ Run the app and configure your settings in the sidebar. Select region, investmen
 ## Requirements
 
 - Python 3.9+
-- Dependencies: streamlit, yfinance, pandas, numpy, matplotlib, scikit-learn, plotly, groq, twilio
+- Dependencies: streamlit, yfinance, pandas, numpy, matplotlib, scikit-learn, plotly, openai, twilio
