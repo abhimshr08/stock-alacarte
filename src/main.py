@@ -22,6 +22,13 @@ STOCKS_BY_REGION = {
     'Asia': ['000001.SS', '000002.SZ', '600036.SS', '000858.SZ', '600519.SS', '002142.SZ', '600276.SS', '000001.SZ', '600000.SS', '002415.SZ']  # China stocks
 }
 
+CURRENCY_BY_REGION = {
+    'US': 'USD',
+    'India': 'INR',
+    'Europe': 'EUR',
+    'Asia': 'CNY'
+}
+
 PHONE_EXAMPLE = {
     'US': '+1XXXXXXXXXX',
     'India': '+91XXXXXXXXXX',
