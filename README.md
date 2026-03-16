@@ -1,15 +1,16 @@
-# Advanced Stock Trading AI App
+# Stock-ala-carte: AI-Powered Stock Recommendations
 
-This application uses AI (Large Language Models) to study global markets and provide personalized buy recommendations with potential return estimates. It offers interactive charts, region-specific stock selection, and SMS/WhatsApp notifications for daily alerts.
+This application uses AI (Large Language Models) to study global markets and provide personalized buy recommendations with potential return estimates. It offers interactive charts, region-specific stock selection with dynamic currency support, and SMS notifications for daily alerts.
 
 ## Features
 
 - AI-powered buy recommendations using GPT-4
 - Interactive charts with Plotly
-- Region-based stock analysis (US, India, Europe, Asia)
+- Region-based stock analysis (US, India, Europe, Asia) with appropriate currencies (USD, INR, EUR, CNY)
 - Personalized investment allocations
 - SMS notifications via Twilio
 - Comprehensive trading guidance
+- Error handling for robust operation
 
 ## Installation
 
@@ -31,7 +32,7 @@ Or use Streamlit secrets for deployment.
 
 ## Usage
 
-Run the app and configure your settings in the sidebar. Select region, investment amount, and enable notifications. Click "Get AI-Powered Recommendations" for personalized advice.
+Run the app and configure your settings in the sidebar. Select region, investment amount (in local currency), and enable notifications. Click "Get AI-Powered Recommendations" for personalized advice.
 
 ## Requirements
 
