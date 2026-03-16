@@ -9,7 +9,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.express as px
-import anthropic
+import groq
 from twilio.rest import Client
 import os
 from datetime import datetime
@@ -87,10 +87,10 @@ def recommend_stocks(stocks_list):
     return recommendations[:10]
 
 def get_llm_suggestions(recommendations, investment_amount, currency):
-    """Use Anthropic Claude for advanced buy/sell suggestions"""
-    api_key = st.secrets.get("ANTHROPIC_API_KEY", os.getenv("ANTHROPIC_API_KEY"))
+    """Use Groq LLM for advanced buy/sell suggestions"""
+    api_key = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY"))
     if not api_key:
-        return "Anthropic API key not set. Please configure it to get AI suggestions."
+        return "Groq API key not set. Please configure it to get AI suggestions."
     
     prompt = f"""
     You are an expert stock trader AI with deep knowledge of global markets, technical analysis, fundamental analysis, and trading strategies. Based on the following stock data from the last month, provide buy recommendations for today.
@@ -102,15 +102,13 @@ def get_llm_suggestions(recommendations, investment_amount, currency):
     """
     
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=1000,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+        client = groq.Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1000
         )
-        return message.content[0].text
+        return response.choices[0].message.content
     except Exception as e:
         return f"Error getting AI suggestions: {str(e)}"
 
