@@ -38,27 +38,35 @@ PHONE_EXAMPLE = {
 
 def get_stock_data(ticker, period='1y'):
     """Fetch stock data using yfinance"""
-    stock = yf.Ticker(ticker)
-    data = stock.history(period=period)
-    return data, stock.info
+    try:
+        stock = yf.Ticker(ticker)
+        data = stock.history(period=period)
+        info = stock.info
+        return data, info
+    except Exception as e:
+        st.warning(f"Failed to fetch data for {ticker}: {str(e)}")
+        return pd.DataFrame(), {}
 
 def analyze_stock(ticker):
     """Basic analysis of the stock"""
     try:
-        data, info = get_stock_data(ticker, '1mo')  # Last month for quick analysis
+        # Try 1 week first for Indian stocks, fallback to 1 month
+        data, info = get_stock_data(ticker, '1wk')
+        if data.empty:
+            data, info = get_stock_data(ticker, '1mo')
         if data.empty:
             return None
         
         # Calculate returns
         returns = data['Close'].pct_change().dropna()
-        if returns.empty:
+        if returns.empty or len(returns) < 2:
             return None
         avg_return = returns.mean()
         volatility = returns.std()
         
         # Current price and volume
         current_price = data['Close'].iloc[-1]
-        avg_volume = data['Volume'].mean()
+        avg_volume = data['Volume'].mean() if 'Volume' in data.columns else 0
         
         return {
             'ticker': ticker,
