@@ -22,6 +22,13 @@ STOCKS_BY_REGION = {
     'Asia': ['000001.SS', '000002.SZ', '600036.SS', '000858.SZ', '600519.SS', '002142.SZ', '600276.SS', '000001.SZ', '600000.SS', '002415.SZ']  # China stocks
 }
 
+PHONE_EXAMPLE = {
+    'US': '+1XXXXXXXXXX',
+    'India': '+91XXXXXXXXXX',
+    'Europe': '+44XXXXXXXXXX',  # Assuming UK, can adjust
+    'Asia': '+86XXXXXXXXXX'  # China
+}
+
 def get_stock_data(ticker, period='1y'):
     """Fetch stock data using yfinance"""
     stock = yf.Ticker(ticker)
@@ -30,29 +37,35 @@ def get_stock_data(ticker, period='1y'):
 
 def analyze_stock(ticker):
     """Basic analysis of the stock"""
-    data, info = get_stock_data(ticker, '1mo')  # Last month for quick analysis
-    if data.empty:
+    try:
+        data, info = get_stock_data(ticker, '1mo')  # Last month for quick analysis
+        if data.empty:
+            return None
+        
+        # Calculate returns
+        returns = data['Close'].pct_change().dropna()
+        if returns.empty:
+            return None
+        avg_return = returns.mean()
+        volatility = returns.std()
+        
+        # Current price and volume
+        current_price = data['Close'].iloc[-1]
+        avg_volume = data['Volume'].mean()
+        
+        return {
+            'ticker': ticker,
+            'current_price': current_price,
+            'avg_return': avg_return,
+            'volatility': volatility,
+            'avg_volume': avg_volume,
+            'market_cap': info.get('marketCap', 'N/A') if info else 'N/A',
+            'pe_ratio': info.get('trailingPE', 'N/A') if info else 'N/A',
+            'data': data
+        }
+    except Exception as e:
+        st.warning(f"Error analyzing {ticker}: {str(e)}")
         return None
-    
-    # Calculate returns
-    returns = data['Close'].pct_change().dropna()
-    avg_return = returns.mean()
-    volatility = returns.std()
-    
-    # Current price and volume
-    current_price = data['Close'].iloc[-1]
-    avg_volume = data['Volume'].mean()
-    
-    return {
-        'ticker': ticker,
-        'current_price': current_price,
-        'avg_return': avg_return,
-        'volatility': volatility,
-        'avg_volume': avg_volume,
-        'market_cap': info.get('marketCap', 'N/A'),
-        'pe_ratio': info.get('trailingPE', 'N/A'),
-        'data': data
-    }
 
 def recommend_stocks(stocks_list):
     """Simple recommendation based on average returns and low volatility"""
@@ -66,7 +79,7 @@ def recommend_stocks(stocks_list):
     recommendations = sorted(analyses, key=lambda x: (x['avg_return'], -x['volatility']), reverse=True)
     return recommendations[:10]
 
-def get_llm_suggestions(recommendations, investment_amount):
+def get_llm_suggestions(recommendations, investment_amount, currency):
     """Use OpenAI LLM for advanced buy/sell suggestions"""
     openai.api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
     if not openai.api_key:
@@ -76,9 +89,9 @@ def get_llm_suggestions(recommendations, investment_amount):
     You are an expert stock trader AI with deep knowledge of global markets, technical analysis, fundamental analysis, and trading strategies. Based on the following stock data from the last month, provide buy recommendations for today.
 
     Stocks data:
-    {', '.join([f"{s['ticker']}: Price ${s['current_price']:.2f}, Avg Return {s['avg_return']:.2%}, Volatility {s['volatility']:.2%}" for s in recommendations])}
+    {', '.join([f"{s['ticker']}: Price {currency}{s['current_price']:.2f}, Avg Return {s['avg_return']:.2%}, Volatility {s['volatility']:.2%}" for s in recommendations])}
 
-    User has ${investment_amount} to invest daily. Suggest which stocks to buy, how much to allocate to each, and potential returns based on historical trends. Provide reasoning and risk assessment. Note: This is not financial advice; markets are unpredictable.
+    User has {currency}{investment_amount} to invest daily. Suggest which stocks to buy, how much to allocate to each, and potential returns based on historical trends. Provide reasoning and risk assessment. Note: This is not financial advice; markets are unpredictable.
     """
     
     try:
@@ -112,16 +125,15 @@ def send_sms(message, phone_number):
         return f"Error sending SMS: {str(e)}"
 
 def main():
-    st.title("� Advanced Stock Trading AI App")
-    st.write("AI-powered market analysis with personalized buy recommendations and notifications.")
-    
-    st.warning("⚠️ **Disclaimer**: This app provides educational information only. Investing involves risk, and past performance does not guarantee future results. Consult a financial advisor before making investment decisions. No returns are guaranteed.")
+    st.title("📈 Stock-ala-carte: AI-Powered Stock Recommendations")
+    st.write("Get personalized daily stock picks with AI analysis for selective investing.")
     
     # Sidebar for settings
     st.sidebar.header("Settings")
     region = st.sidebar.selectbox("Select Market Region", list(STOCKS_BY_REGION.keys()))
-    investment_amount = st.sidebar.number_input("Daily Investment Amount ($)", min_value=100, max_value=10000, value=1000, step=100)
-    phone_number = st.sidebar.text_input("Phone Number for SMS (+1XXXXXXXXXX)", "")
+    currency = CURRENCY_BY_REGION[region]
+    investment_amount = st.sidebar.number_input(f"Daily Investment Amount ({currency})", min_value=100, max_value=10000, value=1000, step=100)
+    phone_number = st.sidebar.text_input(f"Phone Number for SMS ({PHONE_EXAMPLE[region]})", "")
     enable_notifications = st.sidebar.checkbox("Enable SMS Notifications")
     
     stocks_list = STOCKS_BY_REGION[region]
@@ -129,13 +141,16 @@ def main():
     if st.button("Get AI-Powered Recommendations"):
         with st.spinner("Analyzing market with AI..."):
             recommendations = recommend_stocks(stocks_list)
-            ai_suggestions = get_llm_suggestions(recommendations, investment_amount)
+            if not recommendations:
+                st.error("Unable to fetch data for any stocks. Please try again later.")
+                return
+            ai_suggestions = get_llm_suggestions(recommendations, investment_amount, currency)
         
-        st.success(f"AI Recommendations for {region} market (${investment_amount} investment):")
+        st.success(f"AI Recommendations for {region} market ({currency}{investment_amount} investment):")
         
         # Display basic recommendations
         for i, stock in enumerate(recommendations, 1):
-            with st.expander(f"{i}. {stock['ticker']} - ${stock['current_price']:.2f}"):
+            with st.expander(f"{i}. {stock['ticker']} - {currency}{stock['current_price']:.2f}"):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.metric("Avg Daily Return", f"{stock['avg_return']:.2%}")
@@ -147,7 +162,7 @@ def main():
                 
                 # Interactive price chart
                 fig = px.line(stock['data'], x=stock['data'].index, y='Close', title=f"{stock['ticker']} Price Trend (Last Month)")
-                fig.update_layout(xaxis_title="Date", yaxis_title="Price (USD)")
+                fig.update_layout(xaxis_title="Date", yaxis_title=f"Price ({currency})")
                 st.plotly_chart(fig, use_container_width=True)
         
         # AI Suggestions
