@@ -1,25 +1,39 @@
-# Stock Trading Analysis App
+# Advanced Stock Trading AI App
 
-This application studies the stock market and provides recommendations for 10 stocks to invest in daily, aiming for profitability. It offers interactive charts, region-specific stock selection, and trading guidance.
+This application uses AI (Large Language Models) to study global markets and provide personalized buy recommendations with potential return estimates. It offers interactive charts, region-specific stock selection, and SMS/WhatsApp notifications for daily alerts.
 
 ## Features
 
-- Market analysis with interactive charts
-- Region-based stock recommendations (US, India, Europe, Asia)
-- Comprehensive stock information display
-- Trading strategies and platform suggestions
+- AI-powered buy recommendations using GPT-4
+- Interactive charts with Plotly
+- Region-based stock analysis (US, India, Europe, Asia)
+- Personalized investment allocations
+- SMS notifications via Twilio
+- Comprehensive trading guidance
 
 ## Installation
 
 1. Clone the repository
 2. Install dependencies: `pip install -r requirements.txt`
-3. Run the app: `streamlit run src/main.py`
+3. Set up API keys (see Configuration)
+4. Run the app: `streamlit run src/main.py`
+
+## Configuration
+
+Create a `.env` file or set environment variables:
+
+- `OPENAI_API_KEY`: Your OpenAI API key for AI suggestions
+- `TWILIO_ACCOUNT_SID`: Twilio account SID for SMS
+- `TWILIO_AUTH_TOKEN`: Twilio auth token
+- `TWILIO_PHONE_NUMBER`: Your Twilio phone number
+
+Or use Streamlit secrets for deployment.
 
 ## Usage
 
-Run the app and select your market region. Click "Get Today's Recommendations" to view top stocks with interactive price charts. Use the trading guide for insights on how to trade.
+Run the app and configure your settings in the sidebar. Select region, investment amount, and enable notifications. Click "Get AI-Powered Recommendations" for personalized advice.
 
 ## Requirements
 
 - Python 3.9+
-- Dependencies: streamlit, yfinance, pandas, numpy, matplotlib, scikit-learn, plotly
+- Dependencies: streamlit, yfinance, pandas, numpy, matplotlib, scikit-learn, plotly, openai, twilio

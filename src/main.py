@@ -9,7 +9,10 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, timedelta
+import openai
+from twilio.rest import Client
+import os
+from datetime import datetime
 
 # Stock lists by region
 STOCKS_BY_REGION = {
@@ -63,20 +66,74 @@ def recommend_stocks(stocks_list):
     recommendations = sorted(analyses, key=lambda x: (x['avg_return'], -x['volatility']), reverse=True)
     return recommendations[:10]
 
-def main():
-    st.title("📈 Stock Trading Analysis App")
-    st.write("Daily recommendations for 10 stocks to invest in. Study the market and make profitable trades.")
+def get_llm_suggestions(recommendations, investment_amount):
+    """Use OpenAI LLM for advanced buy/sell suggestions"""
+    openai.api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+    if not openai.api_key:
+        return "OpenAI API key not set. Please configure it to get AI suggestions."
     
-    # Region selection
-    region = st.selectbox("Select Market Region", list(STOCKS_BY_REGION.keys()))
+    prompt = f"""
+    You are an expert stock trader AI with deep knowledge of global markets, technical analysis, fundamental analysis, and trading strategies. Based on the following stock data from the last month, provide buy recommendations for today.
+
+    Stocks data:
+    {', '.join([f"{s['ticker']}: Price ${s['current_price']:.2f}, Avg Return {s['avg_return']:.2%}, Volatility {s['volatility']:.2%}" for s in recommendations])}
+
+    User has ${investment_amount} to invest daily. Suggest which stocks to buy, how much to allocate to each, and potential returns based on historical trends. Provide reasoning and risk assessment. Note: This is not financial advice; markets are unpredictable.
+    """
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1000
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error getting AI suggestions: {str(e)}"
+
+def send_sms(message, phone_number):
+    """Send SMS using Twilio"""
+    account_sid = st.secrets.get("TWILIO_ACCOUNT_SID", os.getenv("TWILIO_ACCOUNT_SID"))
+    auth_token = st.secrets.get("TWILIO_AUTH_TOKEN", os.getenv("TWILIO_AUTH_TOKEN"))
+    twilio_number = st.secrets.get("TWILIO_PHONE_NUMBER", os.getenv("TWILIO_PHONE_NUMBER"))
+    
+    if not all([account_sid, auth_token, twilio_number]):
+        return "Twilio credentials not set. Please configure them for SMS notifications."
+    
+    client = Client(account_sid, auth_token)
+    try:
+        client.messages.create(
+            body=message,
+            from_=twilio_number,
+            to=phone_number
+        )
+        return "SMS sent successfully!"
+    except Exception as e:
+        return f"Error sending SMS: {str(e)}"
+
+def main():
+    st.title("� Advanced Stock Trading AI App")
+    st.write("AI-powered market analysis with personalized buy recommendations and notifications.")
+    
+    st.warning("⚠️ **Disclaimer**: This app provides educational information only. Investing involves risk, and past performance does not guarantee future results. Consult a financial advisor before making investment decisions. No returns are guaranteed.")
+    
+    # Sidebar for settings
+    st.sidebar.header("Settings")
+    region = st.sidebar.selectbox("Select Market Region", list(STOCKS_BY_REGION.keys()))
+    investment_amount = st.sidebar.number_input("Daily Investment Amount ($)", min_value=100, max_value=10000, value=1000, step=100)
+    phone_number = st.sidebar.text_input("Phone Number for SMS (+1XXXXXXXXXX)", "")
+    enable_notifications = st.sidebar.checkbox("Enable SMS Notifications")
+    
     stocks_list = STOCKS_BY_REGION[region]
     
-    if st.button("Get Today's Recommendations"):
-        with st.spinner("Analyzing market..."):
+    if st.button("Get AI-Powered Recommendations"):
+        with st.spinner("Analyzing market with AI..."):
             recommendations = recommend_stocks(stocks_list)
+            ai_suggestions = get_llm_suggestions(recommendations, investment_amount)
         
-        st.success(f"Top 10 recommendations for {region} market:")
+        st.success(f"AI Recommendations for {region} market (${investment_amount} investment):")
         
+        # Display basic recommendations
         for i, stock in enumerate(recommendations, 1):
             with st.expander(f"{i}. {stock['ticker']} - ${stock['current_price']:.2f}"):
                 col1, col2 = st.columns(2)
@@ -92,26 +149,38 @@ def main():
                 fig = px.line(stock['data'], x=stock['data'].index, y='Close', title=f"{stock['ticker']} Price Trend (Last Month)")
                 fig.update_layout(xaxis_title="Date", yaxis_title="Price (USD)")
                 st.plotly_chart(fig, use_container_width=True)
+        
+        # AI Suggestions
+        st.header("🤖 AI Trading Suggestions")
+        st.write(ai_suggestions)
+        
+        # Send SMS if enabled
+        if enable_notifications and phone_number:
+            message = f"Daily Stock Recommendations ({datetime.now().strftime('%Y-%m-%d')}):\n{ai_suggestions[:500]}..."  # Truncate for SMS
+            result = send_sms(message, phone_number)
+            st.info(result)
     
     # Trading Guide Section
     st.header("💡 How to Use This Data for Trading")
     st.markdown("""
-    **Understanding the Metrics:**
-    - **Avg Daily Return**: Higher positive values indicate better recent performance.
-    - **Volatility**: Lower values suggest more stable stocks, higher for riskier opportunities.
-    - **Market Cap & P/E Ratio**: Help assess company size and valuation.
+    **Understanding the AI Suggestions:**
+    - The AI analyzes market trends, news, and historical data to provide personalized buy recommendations.
+    - Allocations are based on your investment amount and risk assessment.
+    - Potential returns are estimates; actual results vary.
     
     **Trading Strategies:**
-    - **Long-term**: Invest in stocks with consistent positive returns and reasonable volatility.
-    - **Short-term**: Look for high volatility stocks with recent uptrends for quick trades.
-    - **Diversification**: Balance your portfolio across different sectors.
+    - **Diversification**: Spread investments across recommended stocks.
+    - **Risk Management**: Never invest more than you can afford to lose.
+    - **Long-term Holding**: Based on AI signals for sustainable growth.
     
     **Where to Trade:**
     - **US Markets**: Robinhood, Fidelity, E*TRADE, TD Ameritrade
     - **India Markets**: Zerodha, Upstox, Groww, Angel One
-    - **Europe/Asia**: Local brokers like Interactive Brokers for international access
+    - **Europe/Asia**: Interactive Brokers for global access
     
-    **Risk Warning**: This is for educational purposes. Always do your own research and consider consulting a financial advisor. Past performance doesn't guarantee future results.
+    **Daily Notifications**: Set up your phone number and enable SMS for morning alerts.
+    
+    **Risk Warning**: This uses AI for insights but is not a substitute for professional advice. Markets can be volatile.
     """)
 
 if __name__ == "__main__":
