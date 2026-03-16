@@ -9,7 +9,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.express as px
-import openai
+import anthropic
 from twilio.rest import Client
 import os
 from datetime import datetime
@@ -80,10 +80,10 @@ def recommend_stocks(stocks_list):
     return recommendations[:10]
 
 def get_llm_suggestions(recommendations, investment_amount, currency):
-    """Use OpenAI LLM for advanced buy/sell suggestions"""
-    openai.api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-    if not openai.api_key:
-        return "OpenAI API key not set. Please configure it to get AI suggestions."
+    """Use Anthropic Claude for advanced buy/sell suggestions"""
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", os.getenv("ANTHROPIC_API_KEY"))
+    if not api_key:
+        return "Anthropic API key not set. Please configure it to get AI suggestions."
     
     prompt = f"""
     You are an expert stock trader AI with deep knowledge of global markets, technical analysis, fundamental analysis, and trading strategies. Based on the following stock data from the last month, provide buy recommendations for today.
@@ -95,12 +95,15 @@ def get_llm_suggestions(recommendations, investment_amount, currency):
     """
     
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1000
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=1000,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
         )
-        return response.choices[0].message.content
+        return message.content[0].text
     except Exception as e:
         return f"Error getting AI suggestions: {str(e)}"
 
