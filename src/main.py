@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.express as px
 import openai
 from twilio.rest import Client
+from kiteconnect import KiteConnect
 import os
 from datetime import datetime
 
@@ -147,6 +148,66 @@ def send_sms(message, phone_number):
     except Exception as e:
         return f"Error sending SMS: {str(e)}"
 
+def initialize_kite():
+    """Initialize Zerodha Kite connection"""
+    api_key = os.getenv("ZERODHA_API_KEY")
+    if not api_key:
+        return None, "Zerodha API key not set. Please set ZERODHA_API_KEY environment variable."
+    
+    try:
+        kite = KiteConnect(api_key=api_key)
+        # Check if access token is available
+        access_token = os.getenv("ZERODHA_ACCESS_TOKEN")
+        if access_token:
+            kite.set_access_token(access_token)
+            return kite, None
+        else:
+            return None, "Zerodha access token not set. Please authenticate first."
+    except Exception as e:
+        return None, f"Error initializing Kite: {str(e)}"
+
+def calculate_position_size(stock_price, investment_amount, currency):
+    """Calculate number of shares to buy"""
+    if stock_price <= 0:
+        return 0
+    try:
+        quantity = int(investment_amount / stock_price)
+        return max(1, quantity)  # Minimum 1 share
+    except Exception as e:
+        st.warning(f"Error calculating position size: {str(e)}")
+        return 0
+
+def place_trade_order(kite, ticker, quantity, price, order_type="BUY", exchange="NSE"):
+    """Place a buy/sell order on Zerodha"""
+    if not kite:
+        return False, "Kite connection not established"
+    
+    try:
+        # Place order
+        order_id = kite.place_order(
+            tradingsymbol=ticker,
+            exchange=exchange,
+            transaction_type=order_type,
+            quantity=quantity,
+            order_type=kite.ORDER_TYPE_MARKET,  # Market order for immediate execution
+            price=0  # Market orders don't use price
+        )
+        return True, f"Order placed successfully! Order ID: {order_id}"
+    except Exception as e:
+        return False, f"Error placing order: {str(e)}"
+
+def get_holdings(kite):
+    """Get current holdings from Zerodha"""
+    if not kite:
+        return pd.DataFrame(), "Kite connection not established"
+    
+    try:
+        holdings = kite.holdings()
+        df = pd.DataFrame(holdings)
+        return df, None
+    except Exception as e:
+        return pd.DataFrame(), f"Error fetching holdings: {str(e)}"
+
 def main():
     st.title("📈 Stock-ala-carte: AI-Powered Stock Recommendations")
     st.write("Get personalized daily stock picks with AI analysis for selective investing.")
@@ -158,6 +219,18 @@ def main():
     investment_amount = st.sidebar.number_input(f"Daily Investment Amount ({currency})", min_value=100, max_value=10000, value=1000, step=100)
     phone_number = st.sidebar.text_input(f"Phone Number for SMS ({PHONE_EXAMPLE[region]})", "")
     enable_notifications = st.sidebar.checkbox("Enable SMS Notifications")
+    
+    # Zerodha Trading Integration
+    st.sidebar.header("🔐 Zerodha Trading")
+    enable_trading = st.sidebar.checkbox("Enable Live Trading (Zerodha)")
+    kite = None
+    if enable_trading:
+        st.sidebar.info("⚠️ Ensure ZERODHA_API_KEY and ZERODHA_ACCESS_TOKEN are set in environment variables")
+        kite, error = initialize_kite()
+        if error:
+            st.sidebar.error(error)
+        else:
+            st.sidebar.success("✅ Zerodha Connected")
     
     stocks_list = STOCKS_BY_REGION[region]
     
@@ -187,6 +260,31 @@ def main():
                 fig = px.line(stock['data'], x=stock['data'].index, y='Close', title=f"{stock['ticker']} Price Trend (Last Month)")
                 fig.update_layout(xaxis_title="Date", yaxis_title=f"Price ({currency})")
                 st.plotly_chart(fig, use_container_width=True)
+                
+                # Trading Execution (Zerodha)
+                if enable_trading and kite:
+                    st.divider()
+                    st.subheader("🎯 Execute Trade")
+                    quantity = calculate_position_size(stock['current_price'], investment_amount, currency)
+                    st.write(f"**Quantity to Buy:** {quantity} shares @ {currency}{stock['current_price']:.2f}")
+                    st.write(f"**Total Investment:** {currency}{quantity * stock['current_price']:.2f}")
+                    
+                    # Determine exchange based on region
+                    exchange = "NSE" if region == "India" else "NSE"
+                    if region == "US":
+                        exchange = "MCX"
+                    
+                    col_buy, col_skip = st.columns(2)
+                    with col_buy:
+                        if st.button(f"🛒 Buy {quantity} shares", key=f"buy_{stock['ticker']}"):
+                            success, message = place_trade_order(kite, stock['ticker'], quantity, stock['current_price'], "BUY", exchange)
+                            if success:
+                                st.success(message)
+                            else:
+                                st.error(message)
+                    with col_skip:
+                        if st.button(f"⏭️ Skip", key=f"skip_{stock['ticker']}"):
+                            st.info(f"Skipped {stock['ticker']}")
         
         # AI Suggestions
         st.header("🤖 AI Trading Suggestions")
@@ -197,6 +295,20 @@ def main():
             message = f"Daily Stock Recommendations ({datetime.now().strftime('%Y-%m-%d')}):\n{ai_suggestions[:500]}..."  # Truncate for SMS
             result = send_sms(message, phone_number)
             st.info(result)
+    
+    # Show Holdings if Zerodha is connected
+    if enable_trading and kite:
+        st.header("📊 Your Holdings (Zerodha)")
+        holdings_df, error = get_holdings(kite)
+        if error:
+            st.error(error)
+        elif not holdings_df.empty:
+            # Display key columns from holdings
+            display_columns = ['tradingsymbol', 'quantity', 'price', 'last_price']
+            available_columns = [col for col in display_columns if col in holdings_df.columns]
+            st.dataframe(holdings_df[available_columns], use_container_width=True)
+        else:
+            st.info("No holdings currently")
     
     # Trading Guide Section
     st.header("💡 How to Use This Data for Trading")
